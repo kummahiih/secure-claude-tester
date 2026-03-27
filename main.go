@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/subtle"
 	"crypto/tls"
 	"encoding/json"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -81,8 +83,18 @@ func handleRun(token string) http.HandlerFunc {
 		json.NewEncoder(w).Encode(map[string]string{"status": "started"})
 
 		go func() {
-			cmd := exec.Command("bash", testScript)
+			timeoutSec := 300
+			if v := os.Getenv("TEST_TIMEOUT"); v != "" {
+				if n, err := strconv.Atoi(v); err == nil && n > 0 {
+					timeoutSec = n
+				}
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec)*time.Second)
+			defer cancel()
+
+			cmd := exec.CommandContext(ctx, "bash", testScript)
 			cmd.Dir = "/workspace"
+			cmd.WaitDelay = 10 * time.Second
 			cmd.Env = append(os.Environ(),
 				"HOME=/home/appuser",
 			)
@@ -91,7 +103,15 @@ func handleRun(token string) http.HandlerFunc {
 
 			exitCode := 0
 			status := "pass"
-			if err != nil {
+			if ctx.Err() == context.DeadlineExceeded {
+				exitCode = 124
+				status = "fail"
+				if len(out) == 0 {
+					out = []byte("test timed out after " + strconv.Itoa(timeoutSec) + "s")
+				} else {
+					out = append(out, []byte("\ntest timed out after "+strconv.Itoa(timeoutSec)+"s")...)
+				}
+			} else if err != nil {
 				if exitErr, ok := err.(*exec.ExitError); ok {
 					exitCode = exitErr.ExitCode()
 				} else {
