@@ -9,7 +9,8 @@
 - [x] Concurrent run rejection (409 Conflict)
 
 ### TODO
-- [ ] Unit tests (main_test.go) — httptest with mock exec
-- [ ] test.sh for this repo
+- [x] Unit tests (main_test.go) — httptest with mock exec
+- [x] test.sh for this repo
+- [x] Subprocess timeout (context.WithTimeout, 300s default, configurable via TEST_TIMEOUT env, exit code 124 — RR-2)
 - [ ] Integration with tester_mcp.py stdio wrapper in agent
 - [ ] Integration with .mcp.json in claude-server
