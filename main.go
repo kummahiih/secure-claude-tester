@@ -193,9 +193,9 @@ func verifyToken(r *http.Request, expectedToken string) bool {
 }
 
 func main() {
-	token := os.Getenv("MCP_API_TOKEN")
+	token := os.Getenv("TESTER_API_TOKEN")
 	if token == "" {
-		log.Fatal("MCP_API_TOKEN is required")
+		log.Fatal("TESTER_API_TOKEN is required")
 	}
 
 	mux := setupRouter(token)
