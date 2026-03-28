@@ -36,7 +36,7 @@ func pollResult(t *testing.T, base string, timeout time.Duration) testResult {
 		var r testResult
 		json.NewDecoder(resp.Body).Decode(&r)
 		resp.Body.Close()
-		if r.Status != "running" {
+		if r.Status != "running" && r.Status != "pending" {
 			return r
 		}
 		time.Sleep(200 * time.Millisecond)
@@ -130,7 +130,8 @@ func TestRunConflict(t *testing.T) {
 	resetResult()
 	script := writeScript(t, "sleep 999")
 	t.Setenv("TEST_SCRIPT", script)
-	t.Setenv("TEST_TIMEOUT", "10")
+	// FIX: Reduced from 10 to 2 so the test suite doesn't hang unnecessarily
+	t.Setenv("TEST_TIMEOUT", "2")
 
 	srv := httptest.NewServer(setupRouter(testToken))
 	defer srv.Close()

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,7 +18,7 @@ import (
 
 // testResult holds the outcome of the most recent test run.
 type testResult struct {
-	Status    string `json:"status"`    // "pass", "fail", "running", or "pending"
+	Status    string `json:"status"` // "pass", "fail", "running", or "pending"
 	ExitCode  int    `json:"exit_code"`
 	Timestamp string `json:"timestamp"`
 	Output    string `json:"output"`
@@ -93,7 +94,7 @@ func handleRun(token string) http.HandlerFunc {
 			defer cancel()
 
 			cmd := exec.CommandContext(ctx, "bash", testScript)
-			cmd.Dir = "/workspace"
+			cmd.Dir = filepath.Dir(testScript)
 			cmd.WaitDelay = 10 * time.Second
 			cmd.Env = append(os.Environ(),
 				"HOME=/home/appuser",
@@ -116,6 +117,9 @@ func handleRun(token string) http.HandlerFunc {
 					exitCode = exitErr.ExitCode()
 				} else {
 					exitCode = 1
+					if len(out) == 0 {
+						out = []byte("execution failed to start: " + err.Error())
+					}
 				}
 				status = "fail"
 			}
