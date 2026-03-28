@@ -31,8 +31,8 @@ claude-server (or external caller)
 
 | Method | Path | Auth | Description |
 | :--- | :--- | :--- | :--- |
-| POST | /run | Bearer MCP_API_TOKEN | Start async test run. Returns 409 if already running. |
-| GET | /results | Bearer MCP_API_TOKEN | Last test result as JSON |
+| POST | /run | Bearer TESTER_API_TOKEN | Start async test run. Returns 409 if already running. |
+| GET | /results | Bearer TESTER_API_TOKEN | Last test result as JSON |
 | GET | /health | None | Healthcheck |
 
 ## Response Format
@@ -52,7 +52,7 @@ Follows the same isolation pattern as mcp-server (fileserver):
 
 - Runs as UID 1000 (appuser), non-root
 - TLS with internal CA-signed certificate
-- Bearer token auth (MCP_API_TOKEN) on all endpoints except /health
+- Bearer token auth (TESTER_API_TOKEN) on all endpoints except /health
 - entrypoint.sh rejects startup if forbidden secrets are present
 - Workspace mounted read-only — tests cannot modify source
 - No Docker socket access
@@ -65,13 +65,15 @@ Follows the same isolation pattern as mcp-server (fileserver):
 | ANTHROPIC_API_KEY | forbidden |
 | DYNAMIC_AGENT_KEY | forbidden |
 | CLAUDE_API_TOKEN | forbidden |
-| MCP_API_TOKEN | required |
+| MCP_API_TOKEN | forbidden |
+| PLAN_API_TOKEN | forbidden |
+| TESTER_API_TOKEN | required |
 
 ## Configuration
 
 | Env var | Default | Description |
 | :--- | :--- | :--- |
-| MCP_API_TOKEN | (required) | Bearer token for auth |
+| TESTER_API_TOKEN | (required) | Bearer token for auth |
 | TEST_SCRIPT | /workspace/test.sh | Path to test script |
 | SSL_CERT_FILE | /app/certs/ca.crt | CA bundle |
 
