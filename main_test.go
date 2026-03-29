@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -151,4 +152,26 @@ func TestRunConflict(t *testing.T) {
 
 	// Wait for the first run to finish (timeout) so we don't leak
 	pollResult(t, srv.URL, 20*time.Second)
+}
+
+func TestTLSMinVersion13(t *testing.T) {
+	ts := httptest.NewUnstartedServer(setupRouter(testToken))
+	ts.TLS = &tls.Config{MinVersion: tls.VersionTLS13}
+	ts.StartTLS()
+	defer ts.Close()
+
+	// TLS 1.3 client — must succeed.
+	resp, err := ts.Client().Get(ts.URL + "/health")
+	if err != nil {
+		t.Fatalf("TLS 1.3 client failed: %v", err)
+	}
+	resp.Body.Close()
+
+	// TLS 1.2 max client — must be rejected.
+	base := ts.Client().Transport.(*http.Transport).Clone()
+	base.TLSClientConfig.MaxVersion = tls.VersionTLS12
+	_, err = (&http.Client{Transport: base}).Get(ts.URL + "/health")
+	if err == nil {
+		t.Error("expected TLS 1.2 client to be rejected")
+	}
 }
