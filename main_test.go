@@ -175,3 +175,93 @@ func TestTLSMinVersion13(t *testing.T) {
 		t.Error("expected TLS 1.2 client to be rejected")
 	}
 }
+
+func getResultsWait(t *testing.T, base string, wait string) testResult {
+	t.Helper()
+	url := base + "/results"
+	if wait != "" {
+		url += "?wait=" + wait
+	}
+	req, _ := http.NewRequest(http.MethodGet, url, nil)
+	req.Header.Set("Authorization", "Bearer "+testToken)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var r testResult
+	json.NewDecoder(resp.Body).Decode(&r)
+	return r
+}
+
+func TestResultsWaitBlocks(t *testing.T) {
+	resetResult()
+	script := writeScript(t, "echo ok")
+	t.Setenv("TEST_SCRIPT", script)
+
+	srv := httptest.NewServer(setupRouter(testToken))
+	defer srv.Close()
+
+	resp := postRun(t, srv.URL)
+	resp.Body.Close()
+
+	// wait=true should block until the fast script completes
+	r := getResultsWait(t, srv.URL, "true")
+	if r.Status != "pass" {
+		t.Fatalf("expected pass, got %s", r.Status)
+	}
+}
+
+func TestResultsWaitFalseImmediate(t *testing.T) {
+	resetResult()
+	script := writeScript(t, "sleep 999")
+	t.Setenv("TEST_SCRIPT", script)
+	t.Setenv("TEST_TIMEOUT", "3")
+
+	srv := httptest.NewServer(setupRouter(testToken))
+	defer srv.Close()
+
+	resp := postRun(t, srv.URL)
+	resp.Body.Close()
+
+	// give goroutine a moment to start
+	time.Sleep(100 * time.Millisecond)
+
+	// wait=false (or absent) should return immediately with running status
+	r := getResultsWait(t, srv.URL, "false")
+	if r.Status != "running" {
+		t.Fatalf("expected running, got %s", r.Status)
+	}
+
+	// clean up: wait for the short timeout to expire
+	pollResult(t, srv.URL, 15*time.Second)
+}
+
+func TestResultsWaitTimeout(t *testing.T) {
+	resetResult()
+	script := writeScript(t, "sleep 999")
+	t.Setenv("TEST_SCRIPT", script)
+	t.Setenv("TEST_TIMEOUT", "2")
+
+	srv := httptest.NewServer(setupRouter(testToken))
+	defer srv.Close()
+
+	resp := postRun(t, srv.URL)
+	resp.Body.Close()
+
+	// wait=true with a short TEST_TIMEOUT should eventually return (not hang)
+	done := make(chan testResult, 1)
+	go func() {
+		done <- getResultsWait(t, srv.URL, "true")
+	}()
+
+	select {
+	case r := <-done:
+		// should be fail due to timeout
+		if r.Status != "fail" {
+			t.Fatalf("expected fail after timeout, got %s", r.Status)
+		}
+	case <-time.After(20 * time.Second):
+		t.Fatal("wait=true did not return within expected time")
+	}
+}
