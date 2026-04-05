@@ -139,12 +139,34 @@ func handleRun(token string) http.HandlerFunc {
 }
 
 // handleResults returns the stored test result as JSON.
-// GET /results
+// GET /results[?wait=true]
+// When wait=true, blocks until status is no longer "running" or "pending",
+// or until the test timeout + 10s buffer elapses.
 func handleResults(token string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !verifyToken(r, token) {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
+		}
+
+		waitParam := r.URL.Query().Get("wait")
+		if waitParam == "true" {
+			timeoutSec := 300
+			if v := os.Getenv("TEST_TIMEOUT"); v != "" {
+				if n, err := strconv.Atoi(v); err == nil && n > 0 {
+					timeoutSec = n
+				}
+			}
+			deadline := time.Now().Add(time.Duration(timeoutSec+10) * time.Second)
+			for time.Now().Before(deadline) {
+				mu.Lock()
+				s := result.Status
+				mu.Unlock()
+				if s != "running" && s != "pending" {
+					break
+				}
+				time.Sleep(500 * time.Millisecond)
+			}
 		}
 
 		mu.Lock()
