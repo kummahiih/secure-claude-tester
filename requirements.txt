@@ -1,6 +1,6 @@
 # Tester-server runtime + test-tooling dependencies.
 # These packages are installed in the Dockerfile.tester runtime stage.
-pytest==8.3.4
+pytest==9.0.3
 pytest-asyncio==1.3.0
 certifi==2026.2.25
 fastapi==0.135.1
